@@ -1,0 +1,30 @@
+{
+  "groups": [
+    {
+      "name": "Test Group A",
+      "chat_id": "REPLACE_WITH_CHAT_ID",
+      "folder": "groups/test_group_a",
+      "schedule": {
+        "hour": 10,
+        "minute": 0
+      },
+      "jitter_minutes": 15,
+      "files_per_post": 1,
+      "post_order": "oldest",
+      "comic_order": "name"
+    },
+    {
+      "name": "Test Group B",
+      "chat_id": "REPLACE_WITH_CHAT_ID",
+      "folder": "groups/test_group_b",
+      "schedule": {
+        "interval_minutes": 60
+      },
+      "enabled": false,
+      "jitter_minutes": 10,
+      "files_per_post": 1,
+      "post_order": "random",
+      "comic_order": "name"
+    }
+  ]
+}

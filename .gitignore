@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+
+# Media queues stay local; only the folder skeleton is tracked.
+groups/*/To_Send/*
+groups/*/Already_Sent/*
+
+!groups/*/To_Send/.gitkeep
+!groups/*/Already_Sent/.gitkeep
+
+# per-group comic resume state
+groups/*/.post_state.json
+groups/*/.post_state.json.tmp
