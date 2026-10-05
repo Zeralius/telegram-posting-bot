@@ -11,6 +11,8 @@ Automatically posts media to multiple Telegram groups on a schedule. Supports im
 - **Comic support** - drop a `.zip` in `To_Send/` and its pages are posted as a single album, split into batches of 10
 - **Configurable post order** - choose oldest, newest, or random file selection per group
 - **Batch posting** - post multiple files per scheduled run (`files_per_post`)
+- **Comic page counting** - optionally count each page of a comic as its own upload
+  (`comic_pages_as_uploads`), so a 6-page comic consumes 6 upload slots
 - **Fallback mode** - when To_Send is empty, re-posts random files from Already_Sent
 - **Safe file handling** - files only move to Already_Sent after successful upload
 - **Resumable comics** - a comic interrupted part-way picks up at the batch it failed on instead of re-posting
@@ -148,6 +150,7 @@ The bot auto-creates folders and `.gitkeep` files on startup, so you can also ju
 | `enabled` | No | `true` | Set to `false` to keep the group in config.json but leave it out of the schedule. Its folders are still created, so re-enabling it needs no other change. |
 | `jitter_minutes` | No | `15` | Random delay +/- minutes before posting |
 | `files_per_post` | No | `1` | How many files to post per scheduled run |
+| `comic_pages_as_uploads` | No | `false` | Count each page of a comic as its own upload against `files_per_post`. A 6-page comic then consumes 6 slots, so it holds the queue the way 6 single posts would. The comic still posts whole in one run; the first in line always starts even when it is bigger than the budget, so a long comic cannot wedge the queue. |
 | `post_order` | No | `"oldest"` | File selection order: `"oldest"`, `"newest"`, or `"random"` |
 | `comic_order` | No | `"name"` | Page order inside a comic zip: `"name"`, `"date"`, or `"zip_order"` |
 

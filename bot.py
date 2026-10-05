@@ -240,6 +240,41 @@ def is_postable(path: Path) -> bool:
     return media_type_for(path) is not None or is_comic(path)
 
 
+def comic_page_count(archive: Path, order_mode: str = "name") -> int:
+    """How many upload slots this file costs: its pages if a comic, else 1.
+
+    Namelist only, nothing is unpacked. Uses the same filters as extract_comic so
+    the count agrees with what would actually be posted. Anything unreadable
+    counts as 1 rather than blocking the queue.
+    """
+    if not is_comic(archive):
+        return 1
+    try:
+        with zipfile.ZipFile(archive) as zf:
+            pages = 0
+            for info in zf.infolist():
+                if info.is_dir() or "__MACOSX" in info.filename:
+                    continue
+                base = os.path.basename(info.filename.replace("\\", "/"))
+                if not base or base.startswith("."):
+                    continue
+                if media_type_for(Path(base)) not in COMIC_PAGE_TYPES:
+                    continue
+                pages += 1
+            return max(1, pages)
+    except Exception as e:
+        log.warning("Could not read archive %s, counting it as 1 slot: %s", archive.name, e)
+        return 1
+
+
+def slot_cost(path: Path, order_mode: str = "name", pages_as_uploads: bool = False) -> int:
+    """Upload slots one queue entry consumes. Files always cost 1; a comic costs
+    its pages only when the group opts in with comic_pages_as_uploads."""
+    if pages_as_uploads and is_comic(path):
+        return comic_page_count(path, order_mode)
+    return 1
+
+
 def scan_folder(folder: Path, recursive: bool = False) -> list[Path]:
     if not folder.is_dir():
         return []
@@ -289,7 +324,8 @@ def extract_comic(archive: Path, dest: Path, order_mode: str) -> list[Path]:
     return pages
 
 
-def get_next_media(group_folder: Path, count: int = 1, post_order: str = "oldest") -> list[Path]:
+def get_next_media(group_folder: Path, count: int = 1, post_order: str = "oldest",
+                   comic_order: str = "name", pages_as_uploads: bool = False) -> list[Path]:
     to_send = group_folder / "To_Send"
     already_sent = group_folder / "Already_Sent"
 
@@ -301,12 +337,31 @@ def get_next_media(group_folder: Path, count: int = 1, post_order: str = "oldest
     else:
         files.sort(key=lambda p: p.stat().st_mtime)
 
-    results = files[:count]
+    budget = max(1, count)
+    if not pages_as_uploads:
+        results = files[:budget]
+    else:
+        # Pack the run by upload slots, in queue order: a 6-page comic consumes 6
+        # of the budget. First in line always starts, even over budget, so a comic
+        # bigger than the budget posts rather than wedging the queue behind it.
+        results = []
+        used = 0
+        for f in files:
+            cost = slot_cost(f, comic_order, True)
+            if used + cost <= budget:
+                results.append(f)
+                used += cost
+            elif not results:
+                results.append(f)
+                used += cost
+                break
+            else:
+                break
 
     if not results:
         all_sent_files = scan_folder(already_sent, recursive=True)
         if all_sent_files:
-            results = random.sample(all_sent_files, min(count, len(all_sent_files)))
+            results = random.sample(all_sent_files, min(budget, len(all_sent_files)))
 
     return results
 
@@ -409,12 +464,14 @@ async def post_task(bot: Bot, group: dict):
     count = group.get("files_per_post", 1)
     post_order = group.get("post_order", "oldest")
     comic_order = group.get("comic_order", "name")
+    pages_as_uploads = group.get("comic_pages_as_uploads", False) is True
     if comic_order not in COMIC_ORDERS:
         log.warning("[%s] Unknown comic_order '%s', falling back to 'name'", name, comic_order)
         comic_order = "name"
 
-    log.info("[%s] Running post task (up to %d items, order: %s)", name, count, post_order)
-    results = get_next_media(folder, count, post_order)
+    log.info("[%s] Running post task (up to %d upload(s), order: %s%s)", name, count, post_order,
+             ", comics count by pages" if pages_as_uploads else "")
+    results = get_next_media(folder, count, post_order, comic_order, pages_as_uploads)
     if not results:
         log.warning("[%s] No media available in To_Send or Already_Sent", name)
         return
